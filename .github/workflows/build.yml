@@ -1,0 +1,63 @@
+name: Build & Release
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*.*.*']
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y --no-install-recommends cmake gcc libpq-dev
+
+      - name: Build
+        run: |
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+          cmake --build build
+
+      - name: Verify binary
+        run: build/pgopps --version
+
+      - name: Strip binary
+        run: strip build/pgopps
+
+      - name: Prepare release assets
+        if: startsWith(github.ref, 'refs/tags/')
+        run: |
+          cp build/pgopps pgopps-linux-amd64
+          sha256sum pgopps-linux-amd64 > pgopps-linux-amd64.sha256
+
+      - name: Extract release notes from CHANGELOG
+        if: startsWith(github.ref, 'refs/tags/')
+        id: notes
+        run: |
+          VERSION=${GITHUB_REF_NAME#v}
+          BODY=$(awk "/^## \[${VERSION}\]/{flag=1;next} /^## \[/{flag=0} flag" CHANGELOG.md \
+                | sed '/^[[:space:]]*$/d' | head -80)
+          echo "body<<EOF" >> $GITHUB_OUTPUT
+          echo "$BODY" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Create GitHub Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          name: pgopps ${{ github.ref_name }}
+          body: ${{ steps.notes.outputs.body }}
+          files: |
+            pgopps-linux-amd64
+            pgopps-linux-amd64.sha256
+          draft: false
+          prerelease: false
