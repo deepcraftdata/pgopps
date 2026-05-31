@@ -1,10 +1,5 @@
 #include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
-#include <time.h>
-#include <unistd.h>
-#include <pwd.h>
-#include <sys/utsname.h>
 
 #include "pgopps.h"
 
@@ -12,54 +7,23 @@ static void print_header(PGconn *conn, const Options *opts,
                          int auto_count, int restart_count, int manual_count,
                          int score, int total_findings)
 {
-    /* Scan timestamp */
-    char scan_ts[32];
-    time_t now = time(NULL);
-    strftime(scan_ts, sizeof(scan_ts), "%Y-%m-%d %H:%M:%S UTC", gmtime(&now));
-
-    /* Client identity */
-    char client_host[128] = "unknown";
-    gethostname(client_host, sizeof(client_host) - 1);
-    char client_user[64] = "unknown";
-    struct passwd *pw = getpwuid(getuid());
-    if (pw) strncpy(client_user, pw->pw_name, sizeof(client_user) - 1);
-    else if (getenv("USER")) strncpy(client_user, getenv("USER"), sizeof(client_user) - 1);
-
-    /* Platform */
-    char platform[256] = "unknown";
-    struct utsname uts;
-    if (uname(&uts) == 0)
-        snprintf(platform, sizeof(platform), "%s %s %s",
-                 uts.sysname, uts.release, uts.machine);
-
-    /* Server info */
-    char db[128] = "", host[160] = "", pguser[64] = "", ver[16] = "";
-    PGresult *res = PQexec(conn,
-        "SELECT current_database(), current_user,"
-        "  COALESCE(host(inet_server_addr())||':'||inet_server_port()::text,'local'),"
-        "  current_setting('server_version')");
-    if (PQresultStatus(res) == PGRES_TUPLES_OK) {
-        strncpy(db,     PQgetvalue(res, 0, 0), sizeof(db)     - 1);
-        strncpy(pguser, PQgetvalue(res, 0, 1), sizeof(pguser) - 1);
-        strncpy(host,   PQgetvalue(res, 0, 2), sizeof(host)   - 1);
-        strncpy(ver,    PQgetvalue(res, 0, 3), sizeof(ver)     - 1);
-    }
-    PQclear(res);
+    ServerInfo si;
+    server_info_gather(conn, &si);
 
     const char *provider = cloud_provider_name(opts->cloud);
 
     printf("-- ================================================================\n");
     printf("-- pgopps Fix Script\n");
     printf("-- ================================================================\n");
-    printf("-- Generated : %s\n", scan_ts);
-    printf("-- Auditor   : %s@%s\n", client_user, client_host);
-    printf("-- Platform  : %s\n", platform);
+    printf("-- Generated : %s\n", si.scan_ts);
+    printf("-- Auditor   : %s@%s\n", si.client_user, si.client_host);
+    printf("-- Platform  : %s\n", si.platform);
     printf("-- pgopps    : v%s\n", PGOPPS_VERSION);
     printf("-- ----------------------------------------------------------------\n");
-    printf("-- Target    : %s\n", host);
-    printf("-- Database  : %s\n", db);
-    printf("-- PG User   : %s\n", pguser);
-    printf("-- PostgreSQL: %s\n", ver);
+    printf("-- Target    : %s\n", si.host);
+    printf("-- Database  : %s\n", si.database);
+    printf("-- PG User   : %s\n", si.pguser);
+    printf("-- PostgreSQL: %s\n", si.pg_version);
     if (provider)
         printf("-- Provider  : %s\n", provider);
     printf("-- ----------------------------------------------------------------\n");

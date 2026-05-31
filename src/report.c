@@ -47,48 +47,51 @@ static void print_text(Finding **findings, int count, const Options *opts)
 
     for (int i = 0; i < count; i++) {
         Finding *f = findings[i];
-        if (!f) continue;
-        if ((int)f->priority > opts->min_priority) continue;
-
-        if (f->group != current_group) {
-            current_group = f->group;
-            printf(COL_BOLD "[ %s ]\n" COL_RESET, group_name(current_group));
-        }
-
-        char fid[16];
-        snprintf(fid, sizeof(fid), "[%s-%03d]", group_abbrev(f->group), f->id);
-        printf("  %-11s  %s%-8s" COL_RESET "  %s\n",
-               fid,
-               priority_color(f->priority),
-               priority_name(f->priority),
-               f->title);
-
-        if (opts->verbose) {
-            /* 15 spaces aligns label under the priority column;
-               label %-8s + 2 spaces puts content at col 25 (= title start) */
-            if (f->description[0]) {
-                char buf[sizeof(f->description)];
-                strncpy(buf, f->description, sizeof(buf) - 1);
-                buf[sizeof(buf) - 1] = '\0';
-                char *saveptr = NULL;
-                char *line = strtok_r(buf, "\n", &saveptr);
-                int first = 1;
-                while (line) {
-                    if (first)
-                        printf("               " COL_DIM "%-8s" COL_RESET "  %s\n",
-                               "Detail", line);
-                    else
-                        printf("                         %s\n", line);
-                    first = 0;
-                    line = strtok_r(NULL, "\n", &saveptr);
-                }
+        while (f) {
+            if ((int)f->priority > opts->min_priority) {
+                f = f->next;
+                continue;
             }
-            if (f->remediation[0])
-                printf("               " COL_DIM "%-8s" COL_RESET "  %s\n",
-                       "Fix", f->remediation);
-            printf("\n");
+
+            if (f->group != current_group) {
+                current_group = f->group;
+                printf(COL_BOLD "[ %s ]\n" COL_RESET, group_name(current_group));
+            }
+
+            char fid[16];
+            snprintf(fid, sizeof(fid), "[%s-%03d]", group_abbrev(f->group), f->id);
+            printf("  %-11s  %s%-8s" COL_RESET "  %s\n",
+                   fid,
+                   priority_color(f->priority),
+                   priority_name(f->priority),
+                   f->title);
+
+            if (opts->verbose) {
+                if (f->description[0]) {
+                    char buf[sizeof(f->description)];
+                    strncpy(buf, f->description, sizeof(buf) - 1);
+                    buf[sizeof(buf) - 1] = '\0';
+                    char *saveptr = NULL;
+                    char *line = strtok_r(buf, "\n", &saveptr);
+                    int first = 1;
+                    while (line) {
+                        if (first)
+                            printf("               " COL_DIM "%-8s" COL_RESET "  %s\n",
+                                   "Detail", line);
+                        else
+                            printf("                         %s\n", line);
+                        first = 0;
+                        line = strtok_r(NULL, "\n", &saveptr);
+                    }
+                }
+                if (f->remediation[0])
+                    printf("               " COL_DIM "%-8s" COL_RESET "  %s\n",
+                           "Fix", f->remediation);
+                printf("\n");
+            }
+            shown++;
+            f = f->next;
         }
-        shown++;
     }
 
     if (shown == 0)

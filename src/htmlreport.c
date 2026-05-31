@@ -1,10 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <time.h>
-#include <unistd.h>
-#include <pwd.h>
-#include <sys/utsname.h>
 
 #include "pgopps.h"
 
@@ -171,36 +167,8 @@ void htmlreport_print(Finding **findings, int count, int score,
 {
     qsort(findings, count, sizeof(Finding *), cmp_findings);
 
-    /* Metadata */
-    char scan_ts[32];
-    time_t now = time(NULL);
-    strftime(scan_ts, sizeof(scan_ts), "%Y-%m-%d %H:%M:%S UTC", gmtime(&now));
-
-    char client_host[128] = "unknown";
-    gethostname(client_host, sizeof(client_host) - 1);
-    char client_user[64] = "unknown";
-    struct passwd *pw = getpwuid(getuid());
-    if (pw) strncpy(client_user, pw->pw_name, sizeof(client_user)-1);
-    else if (getenv("USER")) strncpy(client_user, getenv("USER"), sizeof(client_user)-1);
-
-    char platform[256] = "unknown";
-    struct utsname uts;
-    if (uname(&uts) == 0)
-        snprintf(platform, sizeof(platform), "%s %s %s",
-                 uts.sysname, uts.release, uts.machine);
-
-    char db[128]="", host[160]="", pguser[64]="", ver[32]="";
-    PGresult *res = PQexec(conn,
-        "SELECT current_database(), current_user,"
-        "  COALESCE(host(inet_server_addr())||':'||inet_server_port()::text,'local'),"
-        "  current_setting('server_version')");
-    if (PQresultStatus(res) == PGRES_TUPLES_OK) {
-        strncpy(db,     PQgetvalue(res,0,0), sizeof(db)-1);
-        strncpy(pguser, PQgetvalue(res,0,1), sizeof(pguser)-1);
-        strncpy(host,   PQgetvalue(res,0,2), sizeof(host)-1);
-        strncpy(ver,    PQgetvalue(res,0,3), sizeof(ver)-1);
-    }
-    PQclear(res);
+    ServerInfo si;
+    server_info_gather(conn, &si);
 
     const char *provider = cloud_provider_name(opts->cloud);
 
@@ -220,12 +188,12 @@ void htmlreport_print(Finding **findings, int count, int score,
     /* Escaped strings */
     char db_e[256], host_e[256], pguser_e[128], ver_e[64];
     char platform_e[256], client_e[128];
-    he(db,          db_e,       sizeof(db_e));
-    he(host,        host_e,     sizeof(host_e));
-    he(pguser,      pguser_e,   sizeof(pguser_e));
-    he(ver,         ver_e,      sizeof(ver_e));
-    he(platform,    platform_e, sizeof(platform_e));
-    he(client_user, client_e,   sizeof(client_e));
+    he(si.database,    db_e,       sizeof(db_e));
+    he(si.host,        host_e,     sizeof(host_e));
+    he(si.pguser,      pguser_e,   sizeof(pguser_e));
+    he(si.pg_version,  ver_e,      sizeof(ver_e));
+    he(si.platform,    platform_e, sizeof(platform_e));
+    he(si.client_user, client_e,   sizeof(client_e));
 
     /* ── DOCTYPE + head ── */
     printf("<!DOCTYPE html>\n"
@@ -290,7 +258,7 @@ void htmlreport_print(Finding **findings, int count, int score,
            "<span class=\"ival\">%s</span></div>\n"
            "  </div>\n"
            "</div>\n\n",
-           scan_ts, client_e, client_host, platform_e);
+           si.scan_ts, client_e, si.client_host, platform_e);
 
     /* ── Severity bar ── */
     printf("<div class=\"sbar\">\n"
@@ -392,7 +360,7 @@ void htmlreport_print(Finding **findings, int count, int score,
            "<a href=\"https://github.com/deepcraftdata/pgopps\">pgopps</a>"
            " v%s &middot; %s\n"
            "</div>\n\n",
-           PGOPPS_VERSION, scan_ts);
+           PGOPPS_VERSION, si.scan_ts);
 
     printf("</div>\n</body>\n</html>\n");
 }

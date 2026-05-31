@@ -3,7 +3,7 @@
 
 #include <libpq-fe.h>
 
-#define PGOPPS_VERSION "0.2.0"
+#define PGOPPS_VERSION "0.2.1"
 #define MAX_FINDINGS    256
 
 /* ----------------------------------------------------------------
@@ -146,6 +146,20 @@ const char    *cloud_param_hint(CloudProvider cp);
 /* ----------------------------------------------------------------
  * Server info summary (src/info.c)
  * ---------------------------------------------------------------- */
+
+/* Common metadata gathered once and shared across output modules */
+typedef struct {
+    char scan_ts[32];       /* "2026-05-31 14:32:01 UTC" */
+    char client_user[64];   /* OS username */
+    char client_host[128];  /* client hostname */
+    char platform[256];     /* "Linux 7.0.9 x86_64" */
+    char host[160];         /* "172.18.0.3:5432" */
+    char database[128];
+    char pguser[64];
+    char pg_version[32];    /* "17.9" */
+} ServerInfo;
+
+void    server_info_gather(PGconn *conn, ServerInfo *out);
 void    db_print_info(PGconn *conn, const Options *opts);
 
 /* ----------------------------------------------------------------

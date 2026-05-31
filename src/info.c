@@ -34,6 +34,44 @@ static void rtrim(char *s)
     while (i >= 0 && (s[i] == ' ' || s[i] == '\n')) s[i--] = '\0';
 }
 
+void server_info_gather(PGconn *conn, ServerInfo *out)
+{
+    memset(out, 0, sizeof(*out));
+
+    time_t now = time(NULL);
+    strftime(out->scan_ts, sizeof(out->scan_ts),
+             "%Y-%m-%d %H:%M:%S UTC", gmtime(&now));
+
+    gethostname(out->client_host, sizeof(out->client_host) - 1);
+
+    struct passwd *pw = getpwuid(getuid());
+    if (pw)
+        strncpy(out->client_user, pw->pw_name, sizeof(out->client_user) - 1);
+    else if (getenv("USER"))
+        strncpy(out->client_user, getenv("USER"), sizeof(out->client_user) - 1);
+    else
+        strncpy(out->client_user, "unknown", sizeof(out->client_user) - 1);
+
+    struct utsname uts;
+    if (uname(&uts) == 0)
+        snprintf(out->platform, sizeof(out->platform), "%s %s %s",
+                 uts.sysname, uts.release, uts.machine);
+    else
+        strncpy(out->platform, "unknown", sizeof(out->platform) - 1);
+
+    PGresult *res = PQexec(conn,
+        "SELECT current_database(), current_user,"
+        "  COALESCE(host(inet_server_addr())||':'||inet_server_port()::text,'local'),"
+        "  current_setting('server_version')");
+    if (PQresultStatus(res) == PGRES_TUPLES_OK) {
+        strncpy(out->database,   PQgetvalue(res,0,0), sizeof(out->database)   - 1);
+        strncpy(out->pguser,     PQgetvalue(res,0,1), sizeof(out->pguser)     - 1);
+        strncpy(out->host,       PQgetvalue(res,0,2), sizeof(out->host)       - 1);
+        strncpy(out->pg_version, PQgetvalue(res,0,3), sizeof(out->pg_version) - 1);
+    }
+    PQclear(res);
+}
+
 void db_print_info(PGconn *conn, const Options *opts)
 {
     const char *sql =

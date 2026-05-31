@@ -10,6 +10,18 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) · Versioning: 
 
 ---
 
+## [0.2.1] - 2026-05-31
+
+### Fixed
+
+- **Linked list traversal in text output** — `print_text` was only printing the head of each check's finding chain. Checks that return multiple findings (e.g. multiple tables) now show all of them correctly in TEXT mode.
+
+### Refactored
+
+- **`ServerInfo` struct** — extracted duplicated server/client metadata gathering (`gethostname`, `getpwuid`, `uname`, DB query) from `fixscript.c` and `htmlreport.c` into a shared `server_info_gather(PGconn*, ServerInfo*)` function in `info.c`. Both output modules now call this instead of duplicating ~35 lines each.
+
+---
+
 ## [0.2.0] - 2026-05-31
 
 ### Added
