@@ -116,6 +116,29 @@ static void print_text(Finding **findings, int count, const Options *opts)
            shown, priority_name(opts->min_priority));
 }
 
+static void json_escape(const char *src, char *dst, size_t n)
+{
+    size_t d = 0;
+    for (const char *s = src; *s && d < n - 1; s++) {
+        unsigned char ch = (unsigned char)*s;
+        if (ch == '"' || ch == '\\') {
+            if (d + 1 < n - 1) { dst[d++] = '\\'; dst[d++] = (char)ch; }
+        } else if (ch == '\n') {
+            if (d + 1 < n - 1) { dst[d++] = '\\'; dst[d++] = 'n'; }
+        } else if (ch == '\r') {
+            if (d + 1 < n - 1) { dst[d++] = '\\'; dst[d++] = 'r'; }
+        } else if (ch == '\t') {
+            if (d + 1 < n - 1) { dst[d++] = '\\'; dst[d++] = 't'; }
+        } else if (ch < 0x20) {
+            int w = snprintf(dst + d, n - d, "\\u%04x", ch);
+            if (w > 0) d += (size_t)w;
+        } else {
+            dst[d++] = (char)ch;
+        }
+    }
+    dst[d] = '\0';
+}
+
 static void print_json(Finding **findings, int count, const Options *opts)
 {
     printf("[\n");
@@ -130,12 +153,17 @@ static void print_json(Finding **findings, int count, const Options *opts)
 
         char fid[16];
         snprintf(fid, sizeof(fid), "%s-%03d", group_abbrev(f->group), f->id);
+
+        char title_j[512], desc_j[8192], rem_j[4096];
+        json_escape(f->title,       title_j, sizeof(title_j));
+        json_escape(f->description, desc_j,  sizeof(desc_j));
+        json_escape(f->remediation, rem_j,   sizeof(rem_j));
+
         printf("  {\"id\":\"%s\",\"priority\":%d,\"priority_name\":\"%s\","
                "\"group\":\"%s\",\"title\":\"%s\","
                "\"description\":\"%s\",\"remediation\":\"%s\"}",
                fid, f->priority, priority_name(f->priority),
-               group_name(f->group), f->title,
-               f->description, f->remediation);
+               group_name(f->group), title_j, desc_j, rem_j);
     }
     printf("\n]\n");
 }

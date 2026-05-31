@@ -20,6 +20,7 @@ static void usage(const char *prog)
         "  -p, --priority 1-5         minimum priority to show (default: 3)\n"
         "  -v, --verbose              show extra detail\n"
         "      --fix-script           emit a ready-to-run SQL fix script\n"
+        "      --exit-code            exit 1 if any CRITICAL or HIGH findings exist\n"
         "  -h, --help                 show this help\n"
         "      --version              show version\n"
         "\n"
@@ -42,13 +43,14 @@ int main(int argc, char *argv[])
         { "priority",   required_argument, NULL, 'p' },
         { "verbose",    no_argument,       NULL, 'v' },
         { "fix-script", no_argument,       NULL, 'F' },
+        { "exit-code",  no_argument,       NULL, 'E' },
         { "help",       no_argument,       NULL, 'h' },
         { "version",    no_argument,       NULL, 'V' },
         { NULL, 0, NULL, 0 }
     };
 
     int c;
-    while ((c = getopt_long(argc, argv, "f:p:vhF", long_opts, NULL)) != -1) {
+    while ((c = getopt_long(argc, argv, "f:p:vhFE", long_opts, NULL)) != -1) {
         switch (c) {
         case 'f':
             if (strcasecmp(optarg, "json") == 0)
@@ -74,6 +76,9 @@ int main(int argc, char *argv[])
             break;
         case 'F':
             opts.fix_script = 1;
+            break;
+        case 'E':
+            opts.exit_code = 1;
             break;
         case 'V':
             printf("pgopps %s\n", PGOPPS_VERSION);
@@ -111,14 +116,24 @@ int main(int argc, char *argv[])
     } else if (opts.format == OUTPUT_HTML) {
         htmlreport_print(findings, count, score, &opts, conn);
     } else {
-        db_print_info(conn, &opts);
+        if (opts.format != OUTPUT_JSON)
+            db_print_info(conn, &opts);
         report_print(findings, count, &opts);
         score_print(score, count, &opts);
+    }
+
+    /* --exit-code: exit 1 if any CRITICAL or HIGH findings exist */
+    int has_critical_or_high = 0;
+    if (opts.exit_code) {
+        for (int i = 0; i < count; i++)
+            for (Finding *f = findings[i]; f; f = f->next)
+                if ((int)f->priority <= PRIORITY_HIGH)
+                    has_critical_or_high = 1;
     }
 
     for (int i = 0; i < count; i++)
         finding_free_list(findings[i]);
 
     db_disconnect(conn);
-    return 0;
+    return has_critical_or_high ? 1 : 0;
 }

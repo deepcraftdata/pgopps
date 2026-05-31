@@ -3,7 +3,7 @@
 
 #include <libpq-fe.h>
 
-#define PGOPPS_VERSION "0.1.4"
+#define PGOPPS_VERSION "0.2.0"
 #define MAX_FINDINGS    256
 
 /* ----------------------------------------------------------------
@@ -90,6 +90,7 @@ typedef struct {
     int           min_priority;   /* filter: only show >= this priority */
     int           verbose;
     int           fix_script;     /* --fix-script: emit SQL fix script instead of report */
+    int           exit_code;      /* --exit-code: exit 1 if CRITICAL or HIGH findings exist */
     CloudProvider cloud;
 } Options;
 

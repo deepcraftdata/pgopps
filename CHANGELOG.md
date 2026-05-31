@@ -10,6 +10,22 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) · Versioning: 
 
 ---
 
+## [0.2.0] - 2026-05-31
+
+### Added
+
+- **`--exit-code` flag** — exits with code `1` if any `CRITICAL` or `HIGH` findings are detected, regardless of the `-p` filter. Enables pgopps as a CI/CD gate:
+  ```bash
+  pgopps --exit-code "postgresql://..." || exit 1
+  ```
+
+### Fixed
+
+- **JSON output was invalid when piped** — the info block was printed to stdout before the JSON array, breaking `| jq .` and any JSON consumer. The info block is now suppressed for JSON format (stdout is clean JSON).
+- **JSON string escaping** — `title`, `description`, and `remediation` fields were printed as raw strings. Characters such as `"`, `\`, `\n`, and control characters are now correctly escaped, producing valid JSON in all cases.
+
+---
+
 ## [0.1.4] - 2026-05-31
 
 ### Added
