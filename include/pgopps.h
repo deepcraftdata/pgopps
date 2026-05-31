@@ -3,7 +3,7 @@
 
 #include <libpq-fe.h>
 
-#define PGOPPS_VERSION "0.1.2"
+#define PGOPPS_VERSION "0.1.3"
 #define MAX_FINDINGS    256
 
 /* ----------------------------------------------------------------
@@ -48,15 +48,26 @@ typedef enum {
 } CloudProvider;
 
 /* ----------------------------------------------------------------
+ * Fix type — how to apply the fix for a finding
+ * ---------------------------------------------------------------- */
+typedef enum {
+    FIX_NONE    = 0,  /* manual action required */
+    FIX_RELOAD,       /* ALTER SYSTEM SET / GRANT — pg_reload_conf() sufficient */
+    FIX_RESTART,      /* ALTER SYSTEM SET — PostgreSQL restart required */
+} FixType;
+
+/* ----------------------------------------------------------------
  * A single finding returned by a check function
  * ---------------------------------------------------------------- */
 typedef struct Finding {
     char            title[256];
     char            description[1024];
     char            remediation[512];
+    char            fix_sql[1024];   /* ready-to-run SQL; empty if manual-only */
     Priority        priority;
     CheckGroup      group;
     int             id;          /* 1-based check index within group — forms the stable finding ID */
+    FixType         fix_type;
     struct Finding *next;
 } Finding;
 
@@ -77,6 +88,7 @@ typedef struct {
     OutputFormat  format;
     int           min_priority;   /* filter: only show >= this priority */
     int           verbose;
+    int           fix_script;     /* --fix-script: emit SQL fix script instead of report */
     CloudProvider cloud;
 } Options;
 
@@ -102,6 +114,12 @@ void    registry_run_all(PGconn *conn, const Options *opts,
  * Report (src/report.c)
  * ---------------------------------------------------------------- */
 void    report_print(Finding **findings, int count, const Options *opts);
+
+/* ----------------------------------------------------------------
+ * Fix script (src/fixscript.c)
+ * ---------------------------------------------------------------- */
+void    fixscript_print(Finding **findings, int count, int score,
+                        const Options *opts, PGconn *conn);
 
 /* ----------------------------------------------------------------
  * Connection helpers (src/connection.c)

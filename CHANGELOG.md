@@ -10,6 +10,24 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) · Versioning: 
 
 ---
 
+## [0.1.3] - 2026-05-31
+
+### Added
+
+- **`--fix-script` flag** — instead of a report, emits a ready-to-run SQL fix script covering all detected findings. Output is valid SQL with `--` comment headers; pipe directly to `psql -f`.
+  - **Automatic (reload)** section: `ALTER SYSTEM SET` and `GRANT`/`REVOKE` fixes that take effect after `SELECT pg_reload_conf()` — no restart required.
+  - **Restart required** section: `ALTER SYSTEM SET` fixes (e.g. `ssl`, `archive_mode`, `wal_level`) that need a PostgreSQL restart.
+  - **Manual action required** section: findings that cannot be automated (file edits, table-specific DDL, extension installs) listed as commented-out guidance.
+  - Script header embeds full audit metadata: generated timestamp, auditor user@host, platform, pgopps version, target DB, Opps Score, and finding counts per section.
+  - Cloud-aware: when connected to a managed instance, a note is prepended explaining that `ALTER SYSTEM SET` must be applied via the provider's parameter group or config UI.
+- **`FixType`** enum (`FIX_NONE`, `FIX_RELOAD`, `FIX_RESTART`) on the `Finding` struct — 15 checks now carry a `fix_sql` field with ready-to-run SQL.
+
+### Changed
+
+- Normal report and fix script are mutually exclusive: `--fix-script` suppresses the info block and findings report, emitting only the SQL script (suitable for `> fix.sql` redirection).
+
+---
+
 ## [0.1.2] - 2026-05-31
 
 ### Added

@@ -55,9 +55,18 @@ static Finding *check_log_connections(PGconn *conn, const Options *opts)
             conn_off ? "login events" : "session terminations");
     }
 
-    return finding_new(PRIORITY_MEDIUM, GROUP_AUDIT_AND_LOGGING, title, desc,
+    Finding *f = finding_new(PRIORITY_MEDIUM, GROUP_AUDIT_AND_LOGGING, title, desc,
         "Set log_connections = on and log_disconnections = on in postgresql.conf. "
         "Reload: SELECT pg_reload_conf();");
+    if (f) {
+        f->fix_type = FIX_RELOAD;
+        strncpy(f->fix_sql,
+            "ALTER SYSTEM SET log_connections = on;\n"
+            "ALTER SYSTEM SET log_disconnections = on;\n"
+            "SELECT pg_reload_conf();",
+            sizeof(f->fix_sql) - 1);
+    }
+    return f;
 }
 
 static Finding *check_slow_query_log(PGconn *conn, const Options *opts)
@@ -72,13 +81,21 @@ static Finding *check_slow_query_log(PGconn *conn, const Options *opts)
 
     if (ms >= 0) return NULL;   /* -1 means disabled */
 
-    return finding_new(PRIORITY_MEDIUM, GROUP_AUDIT_AND_LOGGING,
+    Finding *f = finding_new(PRIORITY_MEDIUM, GROUP_AUDIT_AND_LOGGING,
         "Slow query logging is disabled (log_min_duration_statement = -1)",
         "log_min_duration_statement = -1 means no queries are ever logged by duration. "
         "Slow queries are invisible: there is no way to identify performance regressions, "
         "runaway queries, or anomalous access patterns after the fact.",
         "Set log_min_duration_statement to a reasonable threshold in postgresql.conf "
         "(e.g. 1000 for 1 second). Reload: SELECT pg_reload_conf();");
+    if (f) {
+        f->fix_type = FIX_RELOAD;
+        strncpy(f->fix_sql,
+            "ALTER SYSTEM SET log_min_duration_statement = 1000; -- 1 second\n"
+            "SELECT pg_reload_conf();",
+            sizeof(f->fix_sql) - 1);
+    }
+    return f;
 }
 
 static Finding *check_log_statement(PGconn *conn, const Options *opts)
@@ -95,7 +112,7 @@ static Finding *check_log_statement(PGconn *conn, const Options *opts)
     /* 'none' means no DDL/DML is ever logged */
     if (strcmp(val, "none") != 0) return NULL;
 
-    return finding_new(PRIORITY_MEDIUM, GROUP_AUDIT_AND_LOGGING,
+    Finding *f = finding_new(PRIORITY_MEDIUM, GROUP_AUDIT_AND_LOGGING,
         "log_statement = none — DDL changes are not logged",
         "log_statement = none means schema changes (CREATE, ALTER, DROP), "
         "permission grants, and other DDL statements leave no trace in the logs. "
@@ -104,6 +121,14 @@ static Finding *check_log_statement(PGconn *conn, const Options *opts)
         "Set log_statement = 'ddl' to capture all schema changes. "
         "Use 'mod' to also capture INSERT/UPDATE/DELETE. "
         "Reload: SELECT pg_reload_conf();");
+    if (f) {
+        f->fix_type = FIX_RELOAD;
+        strncpy(f->fix_sql,
+            "ALTER SYSTEM SET log_statement = 'ddl';\n"
+            "SELECT pg_reload_conf();",
+            sizeof(f->fix_sql) - 1);
+    }
+    return f;
 }
 
 static Finding *check_log_line_prefix(PGconn *conn, const Options *opts)
@@ -141,10 +166,18 @@ static Finding *check_log_line_prefix(PGconn *conn, const Options *opts)
         "databases, or client hosts — a baseline audit trail requirement.",
         prefix, missing);
 
-    return finding_new(PRIORITY_MEDIUM, GROUP_AUDIT_AND_LOGGING,
+    Finding *f = finding_new(PRIORITY_MEDIUM, GROUP_AUDIT_AND_LOGGING,
         "log_line_prefix missing required audit fields", desc,
         "Set log_line_prefix = '%%m [%%p] %%u@%%d %%r ' in postgresql.conf. "
         "Reload: SELECT pg_reload_conf().");
+    if (f) {
+        f->fix_type = FIX_RELOAD;
+        strncpy(f->fix_sql,
+            "ALTER SYSTEM SET log_line_prefix = '%m [%p] %q%u@%d ';\n"
+            "SELECT pg_reload_conf();",
+            sizeof(f->fix_sql) - 1);
+    }
+    return f;
 }
 
 static Finding *check_logging_collector(PGconn *conn, const Options *opts)

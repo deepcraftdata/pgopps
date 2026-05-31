@@ -40,12 +40,21 @@ static Finding *check_ssl_enabled(PGconn *conn, const Options *opts)
             "Provide ssl_cert_file and ssl_key_file. "
             "Then enforce SSL for clients in pg_hba.conf using hostssl entries.");
 
-    return finding_new(PRIORITY_HIGH, GROUP_ENCRYPTION,
+    Finding *f = finding_new(PRIORITY_HIGH, GROUP_ENCRYPTION,
         "SSL is disabled — all connections are unencrypted",
         "ssl = off means all data transmitted between clients and the server "
         "is in cleartext. Credentials, query results, and sensitive data are "
         "visible to anyone with network access between client and server.",
         rem);
+    if (f) {
+        f->fix_type = FIX_RESTART;
+        strncpy(f->fix_sql,
+            "-- Ensure ssl_cert_file and ssl_key_file are configured first.\n"
+            "ALTER SYSTEM SET ssl = on;\n"
+            "-- Restart PostgreSQL to apply.",
+            sizeof(f->fix_sql) - 1);
+    }
+    return f;
 }
 
 static Finding *check_ssl_protocol(PGconn *conn, const Options *opts)
@@ -84,9 +93,17 @@ static Finding *check_ssl_protocol(PGconn *conn, const Options *opts)
         "TLS 1.0 and 1.1 are deprecated by RFC 8996 and fail PCI-DSS / SOC-2 audits.",
         ver);
 
-    return finding_new(p, GROUP_ENCRYPTION, title, desc,
+    Finding *f = finding_new(p, GROUP_ENCRYPTION, title, desc,
         "Set ssl_min_protocol_version = 'TLSv1.2' (minimum) or 'TLSv1.3' in "
         "postgresql.conf. Reload: SELECT pg_reload_conf();");
+    if (f) {
+        f->fix_type = FIX_RELOAD;
+        strncpy(f->fix_sql,
+            "ALTER SYSTEM SET ssl_min_protocol_version = 'TLSv1.2';\n"
+            "SELECT pg_reload_conf();",
+            sizeof(f->fix_sql) - 1);
+    }
+    return f;
 }
 
 static Finding *check_password_encryption(PGconn *conn, const Options *opts)
@@ -120,10 +137,20 @@ static Finding *check_password_encryption(PGconn *conn, const Options *opts)
             "to offline dictionary attacks.", val);
     }
 
-    return finding_new(PRIORITY_MEDIUM, GROUP_ENCRYPTION, title, desc,
+    Finding *f = finding_new(PRIORITY_MEDIUM, GROUP_ENCRYPTION, title, desc,
         "Set password_encryption = 'scram-sha-256' in postgresql.conf, "
         "reload (SELECT pg_reload_conf()), then have all login roles reset "
         "their passwords: ALTER ROLE <name> PASSWORD '<new_password>';");
+    if (f) {
+        f->fix_type = FIX_RELOAD;
+        strncpy(f->fix_sql,
+            "ALTER SYSTEM SET password_encryption = 'scram-sha-256';\n"
+            "SELECT pg_reload_conf();\n"
+            "-- Existing roles must reset their passwords to upgrade from MD5:\n"
+            "-- ALTER ROLE <name> PASSWORD '<new_password>';",
+            sizeof(f->fix_sql) - 1);
+    }
+    return f;
 }
 
 static Finding *check_md5_passwords(PGconn *conn, const Options *opts)

@@ -19,6 +19,7 @@ static void usage(const char *prog)
         "  -f, --format  TEXT|JSON|MARKDOWN  output format (default: TEXT)\n"
         "  -p, --priority 1-5         minimum priority to show (default: 3)\n"
         "  -v, --verbose              show extra detail\n"
+        "      --fix-script           emit a ready-to-run SQL fix script\n"
         "  -h, --help                 show this help\n"
         "      --version              show version\n"
         "\n"
@@ -37,16 +38,17 @@ int main(int argc, char *argv[])
     };
 
     static struct option long_opts[] = {
-        { "format",   required_argument, NULL, 'f' },
-        { "priority", required_argument, NULL, 'p' },
-        { "verbose",  no_argument,       NULL, 'v' },
-        { "help",     no_argument,       NULL, 'h' },
-        { "version",  no_argument,       NULL, 'V' },
+        { "format",     required_argument, NULL, 'f' },
+        { "priority",   required_argument, NULL, 'p' },
+        { "verbose",    no_argument,       NULL, 'v' },
+        { "fix-script", no_argument,       NULL, 'F' },
+        { "help",       no_argument,       NULL, 'h' },
+        { "version",    no_argument,       NULL, 'V' },
         { NULL, 0, NULL, 0 }
     };
 
     int c;
-    while ((c = getopt_long(argc, argv, "f:p:vh", long_opts, NULL)) != -1) {
+    while ((c = getopt_long(argc, argv, "f:p:vhF", long_opts, NULL)) != -1) {
         switch (c) {
         case 'f':
             if (strcasecmp(optarg, "json") == 0)
@@ -67,6 +69,9 @@ int main(int argc, char *argv[])
             break;
         case 'v':
             opts.verbose = 1;
+            break;
+        case 'F':
+            opts.fix_script = 1;
             break;
         case 'V':
             printf("pgopps %s\n", PGOPPS_VERSION);
@@ -91,8 +96,6 @@ int main(int argc, char *argv[])
 
     opts.cloud = db_detect_cloud(conn);
 
-    db_print_info(conn, &opts);
-
     registry_init();
 
     Finding *findings[MAX_FINDINGS];
@@ -101,8 +104,13 @@ int main(int argc, char *argv[])
 
     int score = score_calculate(findings, count);
 
-    report_print(findings, count, &opts);
-    score_print(score, count, &opts);
+    if (opts.fix_script) {
+        fixscript_print(findings, count, score, &opts, conn);
+    } else {
+        db_print_info(conn, &opts);
+        report_print(findings, count, &opts);
+        score_print(score, count, &opts);
+    }
 
     for (int i = 0; i < count; i++)
         finding_free_list(findings[i]);

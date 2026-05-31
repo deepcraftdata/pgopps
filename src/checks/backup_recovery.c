@@ -43,7 +43,7 @@ static Finding *check_archive_mode(PGconn *conn, const Options *opts)
     PQclear(res);
 
     if (strcmp(mode, "off") == 0) {
-        return finding_new(PRIORITY_HIGH, GROUP_BACKUP_RECOVERY,
+        Finding *f = finding_new(PRIORITY_HIGH, GROUP_BACKUP_RECOVERY,
             "archive_mode = off — WAL archiving disabled, no PITR possible",
             "archive_mode = off means WAL segments are not archived. "
             "Point-in-time recovery (PITR) is impossible: you can only restore "
@@ -52,6 +52,16 @@ static Finding *check_archive_mode(PGconn *conn, const Options *opts)
             "if the primary is lost.",
             "Set archive_mode = on and configure archive_command (or archive_library) "
             "in postgresql.conf. Requires a PostgreSQL restart.");
+        if (f) {
+            f->fix_type = FIX_RESTART;
+            strncpy(f->fix_sql,
+                "ALTER SYSTEM SET archive_mode = on;\n"
+                "-- Also set archive_command before restarting, e.g.:\n"
+                "-- ALTER SYSTEM SET archive_command = 'cp %p /mnt/wal_archive/%f';\n"
+                "-- Restart PostgreSQL to apply.",
+                sizeof(f->fix_sql) - 1);
+        }
+        return f;
     }
 
     /* archive_mode is on but command is empty or disabled */
@@ -199,7 +209,7 @@ static Finding *check_wal_keep_size(PGconn *conn, const Options *opts)
         PQclear(slot_res);
     }
 
-    return finding_new(PRIORITY_MEDIUM, GROUP_BACKUP_RECOVERY,
+    Finding *f = finding_new(PRIORITY_MEDIUM, GROUP_BACKUP_RECOVERY,
         "No WAL retention configured (wal_keep_size = 0, archive_mode = off)",
         "wal_keep_size = 0 and archive_mode = off means no WAL segments are "
         "retained beyond what is immediately needed. "
@@ -208,6 +218,14 @@ static Finding *check_wal_keep_size(PGconn *conn, const Options *opts)
         "Set wal_keep_size to retain enough WAL to cover your longest expected "
         "standby lag (e.g. wal_keep_size = 1024 for 1 GB). "
         "Or enable archiving for unlimited WAL history.");
+    if (f) {
+        f->fix_type = FIX_RELOAD;
+        strncpy(f->fix_sql,
+            "ALTER SYSTEM SET wal_keep_size = 1024; -- 1 GB; adjust for your standby lag\n"
+            "SELECT pg_reload_conf();",
+            sizeof(f->fix_sql) - 1);
+    }
+    return f;
 }
 
 static Finding *check_pitr_verify(PGconn *conn, const Options *opts)

@@ -187,7 +187,7 @@ static Finding *check_synchronous_commit(PGconn *conn, const Options *opts)
 
     if (strcmp(val, "off") != 0) return NULL;
 
-    return finding_new(PRIORITY_MEDIUM, GROUP_REPLICATION_HA,
+    Finding *f = finding_new(PRIORITY_MEDIUM, GROUP_REPLICATION_HA,
         "synchronous_commit = off — risk of data loss on crash",
         "synchronous_commit = off allows PostgreSQL to report a transaction as "
         "committed before its WAL record is flushed to disk. "
@@ -197,6 +197,14 @@ static Finding *check_synchronous_commit(PGconn *conn, const Options *opts)
         "Set synchronous_commit = on for full durability. "
         "If the performance benefit is needed, use synchronous_commit = local "
         "to at least guarantee local WAL durability while still sending async to standbys.");
+    if (f) {
+        f->fix_type = FIX_RELOAD;
+        strncpy(f->fix_sql,
+            "ALTER SYSTEM SET synchronous_commit = on;\n"
+            "SELECT pg_reload_conf();",
+            sizeof(f->fix_sql) - 1);
+    }
+    return f;
 }
 
 /* ---------------------------------------------------------------- */

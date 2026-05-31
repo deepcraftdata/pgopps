@@ -87,12 +87,20 @@ static Finding *check_wal_level(PGconn *conn, const Options *opts)
         "Set wal_level = replica (or logical) in postgresql.conf and restart PostgreSQL.");
     append_cloud_hint(rem, sizeof(rem), opts->cloud);
 
-    return finding_new(PRIORITY_HIGH, GROUP_CONFIGURATION,
+    Finding *f = finding_new(PRIORITY_HIGH, GROUP_CONFIGURATION,
         "wal_level = minimal",
         "wal_level = minimal disables WAL archiving, streaming replication, "
         "and logical decoding. Point-in-time recovery (PITR) is impossible "
         "and no standby server can be attached.",
         rem);
+    if (f) {
+        f->fix_type = FIX_RESTART;
+        strncpy(f->fix_sql,
+            "ALTER SYSTEM SET wal_level = 'replica';\n"
+            "-- Restart PostgreSQL to apply.",
+            sizeof(f->fix_sql) - 1);
+    }
+    return f;
 }
 
 static Finding *check_max_connections(PGconn *conn, const Options *opts)
@@ -162,8 +170,18 @@ static Finding *check_work_mem(PGconn *conn, const Options *opts)
         "account for max_connections × work_mem in your RAM budget.");
     append_cloud_hint(rem, sizeof(rem), opts->cloud);
 
-    return finding_new(PRIORITY_LOW, GROUP_CONFIGURATION,
+    Finding *f = finding_new(PRIORITY_LOW, GROUP_CONFIGURATION,
         "work_mem at default (4MB)", desc, rem);
+    if (f) {
+        f->fix_type = FIX_RELOAD;
+        strncpy(f->fix_sql,
+            "-- Adjust value based on RAM and concurrent connections.\n"
+            "-- Starting point: total_RAM / (max_connections * 4)\n"
+            "ALTER SYSTEM SET work_mem = '64MB';\n"
+            "SELECT pg_reload_conf();",
+            sizeof(f->fix_sql) - 1);
+    }
+    return f;
 }
 
 static Finding *check_checkpoint_completion_target(PGconn *conn, const Options *opts)
@@ -200,8 +218,16 @@ static Finding *check_checkpoint_completion_target(PGconn *conn, const Options *
         "Reload without restart: SELECT pg_reload_conf();");
     append_cloud_hint(rem, sizeof(rem), opts->cloud);
 
-    return finding_new(PRIORITY_MEDIUM, GROUP_CONFIGURATION,
+    Finding *f = finding_new(PRIORITY_MEDIUM, GROUP_CONFIGURATION,
         "checkpoint_completion_target < 0.9", desc, rem);
+    if (f) {
+        f->fix_type = FIX_RELOAD;
+        strncpy(f->fix_sql,
+            "ALTER SYSTEM SET checkpoint_completion_target = 0.9;\n"
+            "SELECT pg_reload_conf();",
+            sizeof(f->fix_sql) - 1);
+    }
+    return f;
 }
 
 static Finding *check_autovacuum(PGconn *conn, const Options *opts)
@@ -222,12 +248,20 @@ static Finding *check_autovacuum(PGconn *conn, const Options *opts)
         "autovacuum_vacuum_cost_delay and autovacuum_vacuum_scale_factor instead.");
     append_cloud_hint(rem, sizeof(rem), opts->cloud);
 
-    return finding_new(PRIORITY_CRITICAL, GROUP_CONFIGURATION,
+    Finding *f = finding_new(PRIORITY_CRITICAL, GROUP_CONFIGURATION,
         "autovacuum is disabled globally",
         "autovacuum = off means dead tuples accumulate indefinitely, leading to "
         "table and index bloat. Eventually transaction ID wraparound will force "
         "PostgreSQL into read-only emergency mode to protect data integrity.",
         rem);
+    if (f) {
+        f->fix_type = FIX_RELOAD;
+        strncpy(f->fix_sql,
+            "ALTER SYSTEM SET autovacuum = on;\n"
+            "SELECT pg_reload_conf();",
+            sizeof(f->fix_sql) - 1);
+    }
+    return f;
 }
 
 static Finding *check_random_page_cost(PGconn *conn, const Options *opts)
@@ -255,8 +289,17 @@ static Finding *check_random_page_cost(PGconn *conn, const Options *opts)
         "Reload without restart: SELECT pg_reload_conf();");
     append_cloud_hint(rem, sizeof(rem), opts->cloud);
 
-    return finding_new(PRIORITY_LOW, GROUP_CONFIGURATION,
+    Finding *f = finding_new(PRIORITY_LOW, GROUP_CONFIGURATION,
         "random_page_cost suggests spinning-disk tuning", desc, rem);
+    if (f) {
+        f->fix_type = FIX_RELOAD;
+        strncpy(f->fix_sql,
+            "-- Apply only if storage is SSD or NVMe.\n"
+            "ALTER SYSTEM SET random_page_cost = 1.1;\n"
+            "SELECT pg_reload_conf();",
+            sizeof(f->fix_sql) - 1);
+    }
+    return f;
 }
 
 /* ---------------------------------------------------------------- */

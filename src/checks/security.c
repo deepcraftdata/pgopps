@@ -74,11 +74,19 @@ static Finding *check_public_schema_create(PGconn *conn, const Options *opts)
         "as a higher-privileged caller).",
         (ver < 150000) ? " (pre-PG15 default, but still a risk)" : "");
 
-    return finding_new(PRIORITY_MEDIUM, GROUP_SECURITY,
+    Finding *f = finding_new(PRIORITY_MEDIUM, GROUP_SECURITY,
         "PUBLIC can CREATE objects in the public schema",
         desc,
         "Revoke the privilege: REVOKE CREATE ON SCHEMA public FROM PUBLIC; "
         "Grant explicit CREATE to roles that legitimately need it.");
+    if (f) {
+        f->fix_type = FIX_RELOAD;
+        strncpy(f->fix_sql,
+            "REVOKE CREATE ON SCHEMA public FROM PUBLIC;\n"
+            "GRANT USAGE ON SCHEMA public TO PUBLIC;",
+            sizeof(f->fix_sql) - 1);
+    }
+    return f;
 }
 
 static Finding *check_hba_trust(PGconn *conn, const Options *opts)
