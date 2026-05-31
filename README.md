@@ -8,7 +8,17 @@ pgopps connects to a PostgreSQL instance with a read-only user, runs a curated s
 
 ## Installation
 
-### Prerequisites
+### Download pre-built binary (Linux x86-64)
+
+```bash
+curl -Lo pgopps https://github.com/deepcraftdata/pgopps/releases/latest/download/pgopps-linux-amd64
+chmod +x pgopps
+sudo mv pgopps /usr/local/bin/
+```
+
+### Build from source
+
+#### Prerequisites
 
 | Package | Arch Linux | Debian/Ubuntu |
 |---|---|---|
@@ -16,10 +26,10 @@ pgopps connects to a PostgreSQL instance with a read-only user, runs a curated s
 | cmake ≥ 3.16 | `cmake` | `cmake` |
 | gcc | `gcc` | `gcc` |
 
-### Build
+#### Build
 
 ```bash
-git clone https://github.com/<you>/pgopps.git
+git clone https://github.com/deepcraftdata/pgopps.git
 cd pgopps
 cmake -S . -B build
 cmake --build build
