@@ -16,7 +16,7 @@ static void usage(const char *prog)
         "                 \"host=localhost dbname=mydb user=readonly\"\n"
         "\n"
         "Options:\n"
-        "  -f, --format  TEXT|JSON|MARKDOWN  output format (default: TEXT)\n"
+        "  -f, --format  TEXT|JSON|MARKDOWN|HTML  output format (default: TEXT)\n"
         "  -p, --priority 1-5         minimum priority to show (default: 3)\n"
         "  -v, --verbose              show extra detail\n"
         "      --fix-script           emit a ready-to-run SQL fix script\n"
@@ -55,6 +55,8 @@ int main(int argc, char *argv[])
                 opts.format = OUTPUT_JSON;
             else if (strcasecmp(optarg, "markdown") == 0 || strcasecmp(optarg, "md") == 0)
                 opts.format = OUTPUT_MARKDOWN;
+            else if (strcasecmp(optarg, "html") == 0)
+                opts.format = OUTPUT_HTML;
             else if (strcasecmp(optarg, "text") != 0) {
                 fprintf(stderr, "Unknown format: %s\n", optarg);
                 return 1;
@@ -106,6 +108,8 @@ int main(int argc, char *argv[])
 
     if (opts.fix_script) {
         fixscript_print(findings, count, score, &opts, conn);
+    } else if (opts.format == OUTPUT_HTML) {
+        htmlreport_print(findings, count, score, &opts, conn);
     } else {
         db_print_info(conn, &opts);
         report_print(findings, count, &opts);

@@ -10,6 +10,21 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) · Versioning: 
 
 ---
 
+## [0.1.4] - 2026-05-31
+
+### Added
+
+- **`-f html` output format** — self-contained single-file HTML report (no external dependencies, works offline). Suitable for email attachments, git-tracked audit history, and screenshots.
+  - Dark header bar with an SVG gauge showing the Opps Score (color-coded green/yellow/red)
+  - Target + Auditor info grid (host, database, PG user, PostgreSQL version, scanned timestamp, client user@hostname, platform)
+  - Severity pills summary (CRITICAL / HIGH / MEDIUM / LOW / INFO counts)
+  - Findings grouped by check group, each row showing ID, priority badge, and title
+  - Combined with `-v`: expands each finding to include Detail text, and a green (reload) or amber (restart-required) SQL Fix block for auto-fixable checks; manual checks show a Remediation block
+  - Responsive layout (single column on mobile)
+  - Footer with pgopps version, GitHub link, and generation timestamp
+
+---
+
 ## [0.1.3] - 2026-05-31
 
 ### Added

@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
-project(pgopps VERSION 0.1.3 LANGUAGES C)
+project(pgopps VERSION 0.1.4 LANGUAGES C)
 
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
@@ -25,6 +25,7 @@ set(SOURCES
     src/utils.c
     src/report.c
     src/fixscript.c
+    src/htmlreport.c
     src/checks/registry.c
     src/checks/performance.c
     src/checks/security.c

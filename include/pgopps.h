@@ -3,7 +3,7 @@
 
 #include <libpq-fe.h>
 
-#define PGOPPS_VERSION "0.1.3"
+#define PGOPPS_VERSION "0.1.4"
 #define MAX_FINDINGS    256
 
 /* ----------------------------------------------------------------
@@ -78,6 +78,7 @@ typedef enum {
     OUTPUT_TEXT,
     OUTPUT_JSON,
     OUTPUT_MARKDOWN,
+    OUTPUT_HTML,
 } OutputFormat;
 
 /* ----------------------------------------------------------------
@@ -120,6 +121,12 @@ void    report_print(Finding **findings, int count, const Options *opts);
  * ---------------------------------------------------------------- */
 void    fixscript_print(Finding **findings, int count, int score,
                         const Options *opts, PGconn *conn);
+
+/* ----------------------------------------------------------------
+ * HTML report (src/htmlreport.c)
+ * ---------------------------------------------------------------- */
+void    htmlreport_print(Finding **findings, int count, int score,
+                         const Options *opts, PGconn *conn);
 
 /* ----------------------------------------------------------------
  * Connection helpers (src/connection.c)
