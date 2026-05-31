@@ -1,0 +1,11 @@
+build/
+*.o
+*.a
+*.so
+pgopps
+.cache/
+compile_commands.json
+.vscode/
+.idea/
+*.swp
+*~
